@@ -1,0 +1,20 @@
+---
+# sshd drop-ins are first-match-wins. Ubuntu cloud images ship
+# 50-cloud-init.conf with "PasswordAuthentication yes", so our hardening
+# must sort first (00-) to take effect. An earlier attempt used 99-, which
+# lost to 50-; remove that stale file if present.
+- name: Remove stale 99- hardening drop-in (loses first-match to cloud-init)
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/99-civpvp-hardening.conf
+    state: absent
+  notify: reload ssh
+
+- name: Install sshd hardening drop-in (00- wins first-match)
+  ansible.builtin.template:
+    src: 00-civpvp-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-civpvp-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "/usr/sbin/sshd -t -f %s"
+  notify: reload ssh

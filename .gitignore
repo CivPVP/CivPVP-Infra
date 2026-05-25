@@ -1,0 +1,8 @@
+# never commit secrets or runtime artifacts
+*.retry
+*.vault
+.vault_pass*
+ansible/*.log
+
+# real inventory holds host IP / user / key path — keep it local
+ansible/inventory.ini

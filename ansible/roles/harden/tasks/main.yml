@@ -1,0 +1,5 @@
+---
+- ansible.builtin.import_tasks: sshd.yml
+- ansible.builtin.import_tasks: ufw.yml
+- ansible.builtin.import_tasks: fail2ban.yml
+- ansible.builtin.import_tasks: unattended-upgrades.yml

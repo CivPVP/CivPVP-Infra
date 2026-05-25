@@ -1,0 +1,10 @@
+# Managed by CivPVP-Infra. Key-only SSH access.
+# Named 00- so it sorts first: sshd uses first-match-wins across
+# sshd_config.d/*.conf, and Ubuntu cloud images ship a 50-cloud-init.conf
+# that sets "PasswordAuthentication yes". This file must precede it.
+PasswordAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+UsePAM yes

@@ -1,0 +1,12 @@
+---
+- name: Harden VPS
+  hosts: vps
+  become: true
+  pre_tasks:
+    - name: Assert Debian/Ubuntu (role targets apt/ufw/unattended-upgrades)
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian"
+        fail_msg: "Detected {{ ansible_facts['os_family'] }}; this role targets Debian/Ubuntu and must be adapted first."
+  roles:
+    - harden
