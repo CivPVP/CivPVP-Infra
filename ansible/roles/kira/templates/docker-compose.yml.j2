@@ -1,0 +1,59 @@
+services:
+  kira:
+    image: {{ kira_image }}
+    container_name: kira
+    restart: unless-stopped
+    # Kira's main thread reads the console for interactive commands; without a
+    # tty/stdin it hits EOF and throws. CivMC sets both for this reason.
+    tty: true
+    stdin_open: true
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    volumes:
+      - {{ kira_dir }}/config.json:/app/config.json:ro
+    networks: [kira]
+
+  rabbitmq:
+    image: {{ rabbitmq_image }}
+    container_name: kira-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: "{{ vault_rmq_admin_password }}"
+    volumes:
+      - {{ kira_dir }}/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - {{ kira_dir }}/certs:/etc/rabbitmq/certs:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "5671:5671"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks: [kira]
+
+  postgres:
+    image: {{ postgres_image }}
+    container_name: kira-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kira
+      POSTGRES_PASSWORD: "{{ vault_pg_password }}"
+      POSTGRES_DB: kira
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kira"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [kira]
+
+networks:
+  kira:
+
+volumes:
+  rabbitmq-data:
+  postgres-data:

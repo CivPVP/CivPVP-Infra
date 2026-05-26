@@ -1,0 +1,7 @@
+---
+# Kira connects to RabbitMQ once at startup and doesn't retry a failed initial
+# connection. On a fresh deploy it races ahead of user creation, so restart it
+# after the users exist. Notified only when users are newly created → idempotent.
+- name: restart kira
+  ansible.builtin.command: docker restart kira
+  changed_when: true

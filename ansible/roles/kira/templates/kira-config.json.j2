@@ -1,0 +1,27 @@
+{
+  "db": {
+    "host": "postgres",
+    "port": 5432,
+    "database": "kira",
+    "user": "kira",
+    "password": "{{ vault_pg_password }}"
+  },
+  "rabbitmq": {
+    "host": "rabbitmq",
+    "port": 5672,
+    "user": "kira",
+    "password": "{{ vault_rmq_kira_password }}",
+    "incomingQueue": "gateway-to-kira",
+    "outgoingQueue": "kira-to-gateway"
+  },
+  "bot": {
+    "serverid": {{ vault_discord_guild_id }},
+    "authroleid": {{ vault_discord_auth_role_id }},
+    "token": "{{ vault_discord_token }}"
+  },
+  "api": { "address": "localhost", "port": 80, "sslCertPassword": null, "sslCertPath": null },
+  "consoleforward": {},
+  "apirate": "500ms",
+  "commandprefix": "!kira ",
+  "relayCategory": 0
+}

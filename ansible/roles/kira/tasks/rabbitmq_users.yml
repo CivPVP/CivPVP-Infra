@@ -1,0 +1,32 @@
+---
+- name: List existing RabbitMQ users
+  ansible.builtin.command: docker exec kira-rabbitmq rabbitmqctl -q list_users
+  register: rmq_users
+  changed_when: false
+
+- name: Create kira + gateway users
+  ansible.builtin.command: docker exec kira-rabbitmq rabbitmqctl add_user {{ item.u }} {{ item.p }}
+  loop:
+    - { u: kira, p: "{{ vault_rmq_kira_password }}" }
+    - { u: gateway, p: "{{ vault_rmq_gateway_password }}" }
+  when: item.u not in rmq_users.stdout
+  no_log: true
+  notify: restart kira
+
+- name: Ensure passwords match the vault (idempotent)
+  ansible.builtin.command: docker exec kira-rabbitmq rabbitmqctl change_password {{ item.u }} {{ item.p }}
+  loop:
+    - { u: kira, p: "{{ vault_rmq_kira_password }}" }
+    - { u: gateway, p: "{{ vault_rmq_gateway_password }}" }
+  changed_when: false
+  no_log: true
+
+- name: Grant kira + gateway perms on the default vhost
+  ansible.builtin.command: docker exec kira-rabbitmq rabbitmqctl set_permissions -p / {{ item }} ".*" ".*" ".*"
+  loop: [kira, gateway]
+  changed_when: false
+
+- name: Drop the default guest user (only if present — keeps re-runs idempotent)
+  ansible.builtin.command: docker exec kira-rabbitmq rabbitmqctl delete_user guest
+  when: "'guest' in rmq_users.stdout"
+  changed_when: true

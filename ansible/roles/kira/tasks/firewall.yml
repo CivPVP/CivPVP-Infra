@@ -1,0 +1,10 @@
+---
+# 5671 is the only Kira port exposed. mint-servers' outbound IP is unconfirmed
+# and may be NATed on a shared node, so this opens 5671 broadly and relies on
+# TLS + auth (+ mTLS in 2b) as the gate. If a stable egress IP is confirmed,
+# replace `rule: allow` with a `src`-scoped rule.
+- name: Allow RabbitMQ TLS (amqps) on 5671
+  community.general.ufw:
+    rule: allow
+    port: "5671"
+    proto: tcp

@@ -1,0 +1,66 @@
+---
+- name: Generate CivPVP private CA + RabbitMQ server cert (local)
+  hosts: vps
+  gather_facts: false
+  connection: local
+  become: false
+  vars:
+    # local play: use ansible's own python (has the cryptography lib), not the
+    # inventory's /usr/bin/python3 (the macOS system python, which lacks it)
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    certs_dir: "{{ playbook_dir }}/certs"
+  tasks:
+    - name: Ensure certs dir
+      ansible.builtin.file:
+        path: "{{ certs_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: CA private key
+      community.crypto.openssl_privatekey:
+        path: "{{ certs_dir }}/ca.key"
+        type: RSA
+        size: 4096
+
+    # This community.crypto version takes subject/extensions via a CSR, not
+    # inline on x509_certificate — so the CA gets a CSR too.
+    - name: CA CSR (subject + CA constraints)
+      community.crypto.openssl_csr:
+        path: "{{ certs_dir }}/ca.csr"
+        privatekey_path: "{{ certs_dir }}/ca.key"
+        common_name: "CivPVP-Infra Root CA"
+        basic_constraints: ["CA:TRUE"]
+        basic_constraints_critical: true
+        key_usage: ["keyCertSign", "cRLSign"]
+        key_usage_critical: true
+
+    - name: CA cert (self-signed)
+      community.crypto.x509_certificate:
+        path: "{{ certs_dir }}/ca.crt"
+        privatekey_path: "{{ certs_dir }}/ca.key"
+        csr_path: "{{ certs_dir }}/ca.csr"
+        provider: selfsigned
+        selfsigned_not_after: "+3650d"
+
+    - name: Server private key
+      community.crypto.openssl_privatekey:
+        path: "{{ certs_dir }}/server.key"
+        type: RSA
+        size: 4096
+
+    - name: Server CSR (SAN = VPS IP)
+      community.crypto.openssl_csr:
+        path: "{{ certs_dir }}/server.csr"
+        privatekey_path: "{{ certs_dir }}/server.key"
+        common_name: "{{ inventory_hostname }}"
+        subject_alt_name:
+          - "IP:{{ inventory_hostname }}"
+
+    - name: Server cert signed by our CA
+      community.crypto.x509_certificate:
+        path: "{{ certs_dir }}/server.crt"
+        csr_path: "{{ certs_dir }}/server.csr"
+        provider: ownca
+        ownca_path: "{{ certs_dir }}/ca.crt"
+        ownca_privatekey_path: "{{ certs_dir }}/ca.key"
+        ownca_not_after: "+3650d"

@@ -1,0 +1,12 @@
+---
+- name: Deploy Kira stack
+  hosts: vps
+  become: true
+  pre_tasks:
+    - name: Assert Debian/Ubuntu
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian"
+        fail_msg: "Kira role targets Debian/Ubuntu."
+  roles:
+    - kira

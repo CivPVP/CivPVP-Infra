@@ -1,0 +1,10 @@
+# TLS listener for the remote gateway (2a: server-TLS only).
+listeners.ssl.default = 5671
+ssl_options.cacertfile = /etc/rabbitmq/certs/ca.crt
+ssl_options.certfile   = /etc/rabbitmq/certs/server.crt
+ssl_options.keyfile    = /etc/rabbitmq/certs/server.key
+# 2b flips these two to verify_peer / true for mutual TLS:
+ssl_options.verify = verify_none
+ssl_options.fail_if_no_peer_cert = false
+# Plaintext 5672 stays on the default (docker-network) interface; it is never
+# published to the host in compose. guest is loopback-only by default.
