@@ -1,0 +1,8 @@
+---
+- name: Deploy Kira gateways to mint-servers
+  hosts: vps
+  gather_facts: false
+  connection: local
+  become: false
+  roles:
+    - gateway

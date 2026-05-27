@@ -1,0 +1,12 @@
+rabbitmq:
+  user: gateway
+  password: "{{ vault_rmq_gateway_password }}"
+  host: "{{ inventory_hostname }}"
+  port: 5671
+  tls: true
+  truststorePath: plugins/KiraBukkitGateway/truststore.p12
+  truststorePassword: "{{ vault_truststore_password }}"
+  incomingQueue: kira-to-gateway
+  outgoingQueue: gateway-to-kira
+server-name: "{{ item.server_name }}"
+console: {}

@@ -3,3 +3,15 @@ kira_image: "ghcr.io/civmc/kira:2.1.1"
 rabbitmq_image: "rabbitmq:3.13-management"
 postgres_image: "timescale/timescaledb:2.14.2-pg14"
 kira_dir: /opt/kira
+
+# --- Phase 2b: gateway deploy ---
+# Built jars from the sibling kira-gateway repo (../../kira-gateway from ansible/).
+paper_gateway_jar: "{{ playbook_dir }}/../../kira-gateway/kirabukkitgateway-paper/build/libs/kirabukkitgateway-paper-2.0.3-civpvp-all.jar"
+velocity_gateway_jar: "{{ playbook_dir }}/../../kira-gateway/kiragateway-velocity/build/libs/kiragateway-velocity-1.0-all.jar"
+
+# Per-backend deploy targets. server_name is the routing key Kira binds on;
+# sftp_user_var names the vault key holding that server's SFTP username.
+paper_servers:
+  - { server_name: citadel, sftp_user_var: vault_sftp_user_citadel }
+  - { server_name: lobby,   sftp_user_var: vault_sftp_user_lobby }
+  - { server_name: bunkies, sftp_user_var: vault_sftp_user_bunkies }
