@@ -6,16 +6,41 @@
     mode: "0600"
   loop: "{{ paper_servers }}"
 
-- name: Push Paper gateway to each backend over SFTP
-  ansible.builtin.command:
-    cmd: >
-      lftp -u "{{ lookup('vars', item.sftp_user_var) }},{{ vault_sftp_password }}"
-      sftp://{{ lookup('vars', item.sftp_host_var) }}:{{ vault_sftp_port }}
-      -e "set sftp:auto-confirm yes;
-      put -O plugins {{ paper_gateway_jar }};
-      put -O plugins/KiraBukkitGateway /tmp/kira-gw-{{ item.server_name }}-config.yml -o config.yml;
-      put -O plugins/KiraBukkitGateway {{ playbook_dir }}/certs/truststore.p12;
-      bye"
+# Three pushes per server, each on its own SFTP connection but with proper
+# Ansible changed/ok semantics and size-based idempotency (custom local module
+# at library/sftp_put.py, paramiko-based — no remote shell required, which is
+# why ansible.builtin.copy doesn't work against SFTP-only panels).
+
+- name: Push Paper gateway jar
+  sftp_put:
+    host: "{{ lookup('vars', item.sftp_host_var) }}"
+    port: "{{ vault_sftp_port }}"
+    username: "{{ lookup('vars', item.sftp_user_var) }}"
+    password: "{{ vault_sftp_password }}"
+    src: "{{ paper_gateway_jar }}"
+    dest: "plugins/{{ paper_gateway_jar | basename }}"
+  loop: "{{ paper_servers }}"
+  no_log: true
+
+- name: Push gateway config (creates plugins/KiraBukkitGateway/ if missing)
+  sftp_put:
+    host: "{{ lookup('vars', item.sftp_host_var) }}"
+    port: "{{ vault_sftp_port }}"
+    username: "{{ lookup('vars', item.sftp_user_var) }}"
+    password: "{{ vault_sftp_password }}"
+    src: "/tmp/kira-gw-{{ item.server_name }}-config.yml"
+    dest: "plugins/KiraBukkitGateway/config.yml"
+  loop: "{{ paper_servers }}"
+  no_log: true
+
+- name: Push CA truststore
+  sftp_put:
+    host: "{{ lookup('vars', item.sftp_host_var) }}"
+    port: "{{ vault_sftp_port }}"
+    username: "{{ lookup('vars', item.sftp_user_var) }}"
+    password: "{{ vault_sftp_password }}"
+    src: "{{ playbook_dir }}/certs/truststore.p12"
+    dest: "plugins/KiraBukkitGateway/truststore.p12"
   loop: "{{ paper_servers }}"
   no_log: true
 
