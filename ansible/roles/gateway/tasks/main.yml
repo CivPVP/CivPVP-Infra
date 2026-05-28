@@ -10,7 +10,7 @@
   ansible.builtin.command:
     cmd: >
       lftp -u "{{ lookup('vars', item.sftp_user_var) }},{{ vault_sftp_password }}"
-      sftp://{{ vault_sftp_host }}:{{ vault_sftp_port }}
+      sftp://{{ lookup('vars', item.sftp_host_var) }}:{{ vault_sftp_port }}
       -e "set sftp:auto-confirm yes;
       put -O plugins {{ paper_gateway_jar }};
       put -O plugins/KiraBukkitGateway /tmp/kira-gw-{{ item.server_name }}-config.yml -o config.yml;
@@ -19,27 +19,8 @@
   loop: "{{ paper_servers }}"
   no_log: true
 
-- name: Render Velocity gateway config locally
-  ansible.builtin.template:
-    src: velocity-config.yml.j2
-    dest: /tmp/kira-gw-velocity-config.yml
-    mode: "0600"
-
-- name: Push Velocity gateway over SFTP
-  ansible.builtin.command:
-    cmd: >
-      lftp -u "{{ vault_sftp_user_velocity }},{{ vault_sftp_password }}"
-      sftp://{{ vault_sftp_host }}:{{ vault_sftp_port }}
-      -e "set sftp:auto-confirm yes;
-      put -O plugins {{ velocity_gateway_jar }};
-      put -O plugins/kiragateway /tmp/kira-gw-velocity-config.yml -o config.yml;
-      put -O plugins/kiragateway {{ playbook_dir }}/certs/truststore.p12;
-      bye"
-  no_log: true
-
 - name: Manual restart checkpoint
   ansible.builtin.pause:
     prompt: |
-      Uploaded gateway jar + config + truststore to all 4 servers.
-      Now click RESTART for citadel, lobby, bunkies, and the proxy in the
-      mint-servers panel, then press Enter to continue.
+      Uploaded gateway jar + config + truststore to: {{ paper_servers | map(attribute='server_name') | join(', ') }}.
+      Now click RESTART for each one in the mint-servers panel, then press Enter to continue.
