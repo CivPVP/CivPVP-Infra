@@ -6,27 +6,46 @@
     mode: "0600"
   loop: "{{ paper_servers }}"
 
-# lftp does the SFTP push. Password is fed via LFTP_PASSWORD env var (NOT
-# `-u user,pass`, which would leak the password into argv / ps). One lftp
-# invocation per server uploads all three files in a single SFTP session +
-# mkdir -p's plugins/KiraBukkitGateway/ first, since Bukkit only creates that
-# dir after the plugin first loads. Requires `brew install lftp` locally.
-- name: Push gateway jar + config + truststore via SFTP (one session per server)
-  ansible.builtin.command:
-    cmd: >
-      lftp -e "set sftp:auto-confirm yes;
-               open --env-password
-                    -u {{ lookup('vars', item.sftp_user_var) }}
-                    sftp://{{ lookup('vars', item.sftp_host_var) }}:{{ vault_sftp_port }};
-               mkdir -p -f plugins/KiraBukkitGateway;
-               put {{ paper_gateway_jar }} -o plugins/{{ paper_gateway_jar | basename }};
-               put /tmp/kira-gw-{{ item.server_name }}-config.yml -o plugins/KiraBukkitGateway/config.yml;
-               put {{ playbook_dir }}/certs/truststore.p12 -o plugins/KiraBukkitGateway/truststore.p12;
-               bye"
-  environment:
-    LFTP_PASSWORD: "{{ vault_sftp_password }}"
-  loop: "{{ paper_servers }}"
-  no_log: true
+# Push via Apple's built-in sftp + already-installed sshpass. Password lives in
+# a mode-0600 tempfile read by `sshpass -f` (NOT argv, NOT env — env routes
+# get mangled by shell quoting if the password has special chars). The block's
+# `always` guarantees the tempfile is removed even on failure.
+- name: Push gateway files via sshpass + sftp
+  block:
+    - name: Create SFTP password tempfile
+      ansible.builtin.tempfile:
+        state: file
+        suffix: civpvp_sftp_pass
+      register: sftp_pass_file
+
+    - name: Write password (0600)
+      ansible.builtin.copy:
+        content: "{{ vault_sftp_password }}"
+        dest: "{{ sftp_pass_file.path }}"
+        mode: "0600"
+      no_log: true
+
+    - name: SFTP push (jar + config + truststore, one session per server)
+      ansible.builtin.shell: |
+        sshpass -f "{{ sftp_pass_file.path }}" sftp \
+          -P {{ vault_sftp_port }} \
+          -o BatchMode=no -o StrictHostKeyChecking=no \
+          "{{ lookup('vars', item.sftp_user_var) }}@{{ lookup('vars', item.sftp_host_var) }}" <<'SFTP_EOF'
+        -mkdir plugins/KiraBukkitGateway
+        put {{ paper_gateway_jar }} plugins/{{ paper_gateway_jar | basename }}
+        put /tmp/kira-gw-{{ item.server_name }}-config.yml plugins/KiraBukkitGateway/config.yml
+        put {{ playbook_dir }}/certs/truststore.p12 plugins/KiraBukkitGateway/truststore.p12
+        bye
+        SFTP_EOF
+      loop: "{{ paper_servers }}"
+      no_log: true
+
+  always:
+    - name: Remove SFTP password tempfile
+      ansible.builtin.file:
+        path: "{{ sftp_pass_file.path }}"
+        state: absent
+      when: sftp_pass_file.path is defined
 
 - name: Manual restart checkpoint
   ansible.builtin.pause:
