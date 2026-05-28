@@ -6,6 +6,12 @@
     mode: "0600"
   loop: "{{ paper_servers }}"
 
+- name: Render Velocity gateway config locally
+  ansible.builtin.template:
+    src: velocity-config.yml.j2
+    dest: "/tmp/kira-gw-{{ velocity_server.server_name }}-config.yml"
+    mode: "0600"
+
 # Push via Apple's built-in sftp + already-installed sshpass. Password lives in
 # a mode-0600 tempfile read by `sshpass -f` (NOT argv, NOT env — env routes
 # get mangled by shell quoting if the password has special chars). The block's
@@ -25,7 +31,7 @@
         mode: "0600"
       no_log: true
 
-    - name: SFTP push (jar + config + truststore, one session per server)
+    - name: SFTP push to Paper backends (jar + config + truststore per server)
       ansible.builtin.shell: |
         sshpass -f "{{ sftp_pass_file.path }}" sftp \
           -P {{ vault_sftp_port }} \
@@ -40,6 +46,20 @@
       loop: "{{ paper_servers }}"
       no_log: true
 
+    - name: SFTP push to Velocity proxy
+      ansible.builtin.shell: |
+        sshpass -f "{{ sftp_pass_file.path }}" sftp \
+          -P {{ vault_sftp_port }} \
+          -o BatchMode=no -o StrictHostKeyChecking=no \
+          "{{ lookup('vars', velocity_server.sftp_user_var) }}@{{ lookup('vars', velocity_server.sftp_host_var) }}" <<'SFTP_EOF'
+        -mkdir plugins/kiragateway
+        put {{ velocity_gateway_jar }} plugins/{{ velocity_gateway_jar | basename }}
+        put /tmp/kira-gw-{{ velocity_server.server_name }}-config.yml plugins/kiragateway/config.yml
+        put {{ playbook_dir }}/certs/truststore.p12 plugins/kiragateway/truststore.p12
+        bye
+        SFTP_EOF
+      no_log: true
+
   always:
     - name: Remove SFTP password tempfile
       ansible.builtin.file:
@@ -50,6 +70,7 @@
 - name: Manual restart checkpoint
   ansible.builtin.pause:
     prompt: |
-      Uploaded gateway jar + config + truststore to: {{ paper_servers | map(attribute='server_name') | join(', ') }}.
-      Now click RESTART for each one in the mint-servers panel, then press Enter to continue.
+      Uploaded gateway to: {{ (paper_servers | map(attribute='server_name') | list) + [velocity_server.server_name] | join(', ') }}.
+      Click RESTART for the NEWLY DEPLOYED ones (citadel was already up; restart bunkies + proxy).
+      Press Enter when done to continue.
   tags: manual_restart

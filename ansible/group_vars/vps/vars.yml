@@ -5,17 +5,25 @@ postgres_image: "timescale/timescaledb:2.14.2-pg14"
 kira_dir: /opt/kira
 
 # --- Phase 2b: gateway deploy ---
-# Built jar from the sibling kira-gateway repo (../../kira-gateway from ansible/).
-# Only the Paper jar is needed: both mint-servers backends are Paper (any Velocity
-# proxy in the network is not in this account, so not ours to deploy to).
-paper_gateway_jar: "{{ playbook_dir }}/../../kira-gateway/kirabukkitgateway-paper/build/libs/kirabukkitgateway-paper-2.0.3-civpvp-all.jar"
+# Built jars from the sibling kira-gateway repo (../../kira-gateway from ansible/).
+paper_gateway_jar:    "{{ playbook_dir }}/../../kira-gateway/kirabukkitgateway-paper/build/libs/kirabukkitgateway-paper-2.0.3-civpvp-all.jar"
+velocity_gateway_jar: "{{ playbook_dir }}/../../kira-gateway/kiragateway-velocity/build/libs/kiragateway-velocity-1.0-all.jar"
 
-# Per-backend deploy targets. server_name = the routing key Kira binds on.
+# Per-server deploy targets. server_name = the routing key Kira binds on.
 # sftp_{host,user}_var name the vault keys for that server's SFTP endpoint;
 # mint-servers gives each game server its own SFTP host + username.
 paper_servers:
   - server_name: citadel
     sftp_host_var: vault_sftp_host_citadel
     sftp_user_var: vault_sftp_user_citadel
+  - server_name: bunkies
+    sftp_host_var: vault_sftp_host_bunkies
+    sftp_user_var: vault_sftp_user_bunkies
   # lobby is intentionally skipped: it lacks NameLayer + CivChat2, which
   # KiraBukkitGateway hard-depends on. Re-add if those plugins are installed.
+
+# The shared Velocity proxy. Kira routes to it by server-name 'proxy'.
+velocity_server:
+  server_name: proxy
+  sftp_host_var: vault_sftp_host_velocity
+  sftp_user_var: vault_sftp_user_velocity
