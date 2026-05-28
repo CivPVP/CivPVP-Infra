@@ -37,6 +37,7 @@
     src: kira-config.json.j2
     dest: "{{ kira_dir }}/config.json"
     mode: "0640"
+  notify: restart kira
 
 - name: Render docker-compose.yml
   ansible.builtin.template:
