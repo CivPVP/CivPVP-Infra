@@ -9,6 +9,7 @@
     # inventory's /usr/bin/python3 (the macOS system python, which lacks it)
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
     certs_dir: "{{ playbook_dir }}/certs"
+    truststore_password: "{{ vault_truststore_password }}"
   tasks:
     - name: Ensure certs dir
       ansible.builtin.file:
@@ -64,3 +65,14 @@
         ownca_path: "{{ certs_dir }}/ca.crt"
         ownca_privatekey_path: "{{ certs_dir }}/ca.key"
         ownca_not_after: "+3650d"
+
+    # PKCS12 truststore holding only the CA — the gateways' trust anchor.
+    # keytool writes a proper trustedCertEntry (reliable for Java TrustManager).
+    - name: Build a PKCS12 truststore containing our CA
+      ansible.builtin.command:
+        cmd: >
+          keytool -importcert -noprompt -alias civpvp-ca
+          -file {{ certs_dir }}/ca.crt
+          -keystore {{ certs_dir }}/truststore.p12 -storetype PKCS12
+          -storepass {{ truststore_password }}
+        creates: "{{ certs_dir }}/truststore.p12"

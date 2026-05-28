@@ -4,9 +4,5 @@
   gather_facts: false
   connection: local
   become: false
-  vars:
-    # sftp_put needs paramiko, which lives in ansible's own Python (not the
-    # default /usr/bin/python3 on macOS).
-    ansible_python_interpreter: "{{ ansible_playbook_python }}"
   roles:
     - gateway

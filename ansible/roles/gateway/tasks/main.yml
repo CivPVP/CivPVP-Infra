@@ -6,41 +6,25 @@
     mode: "0600"
   loop: "{{ paper_servers }}"
 
-# Three pushes per server, each on its own SFTP connection but with proper
-# Ansible changed/ok semantics and size-based idempotency (custom local module
-# at library/sftp_put.py, paramiko-based — no remote shell required, which is
-# why ansible.builtin.copy doesn't work against SFTP-only panels).
-
-- name: Push Paper gateway jar
-  sftp_put:
-    host: "{{ lookup('vars', item.sftp_host_var) }}"
-    port: "{{ vault_sftp_port }}"
-    username: "{{ lookup('vars', item.sftp_user_var) }}"
-    password: "{{ vault_sftp_password }}"
-    src: "{{ paper_gateway_jar }}"
-    dest: "plugins/{{ paper_gateway_jar | basename }}"
-  loop: "{{ paper_servers }}"
-  no_log: true
-
-- name: Push gateway config (creates plugins/KiraBukkitGateway/ if missing)
-  sftp_put:
-    host: "{{ lookup('vars', item.sftp_host_var) }}"
-    port: "{{ vault_sftp_port }}"
-    username: "{{ lookup('vars', item.sftp_user_var) }}"
-    password: "{{ vault_sftp_password }}"
-    src: "/tmp/kira-gw-{{ item.server_name }}-config.yml"
-    dest: "plugins/KiraBukkitGateway/config.yml"
-  loop: "{{ paper_servers }}"
-  no_log: true
-
-- name: Push CA truststore
-  sftp_put:
-    host: "{{ lookup('vars', item.sftp_host_var) }}"
-    port: "{{ vault_sftp_port }}"
-    username: "{{ lookup('vars', item.sftp_user_var) }}"
-    password: "{{ vault_sftp_password }}"
-    src: "{{ playbook_dir }}/certs/truststore.p12"
-    dest: "plugins/KiraBukkitGateway/truststore.p12"
+# lftp does the SFTP push. Password is fed via LFTP_PASSWORD env var (NOT
+# `-u user,pass`, which would leak the password into argv / ps). One lftp
+# invocation per server uploads all three files in a single SFTP session +
+# mkdir -p's plugins/KiraBukkitGateway/ first, since Bukkit only creates that
+# dir after the plugin first loads. Requires `brew install lftp` locally.
+- name: Push gateway jar + config + truststore via SFTP (one session per server)
+  ansible.builtin.command:
+    cmd: >
+      lftp -e "set sftp:auto-confirm yes;
+               open --env-password
+                    -u {{ lookup('vars', item.sftp_user_var) }}
+                    sftp://{{ lookup('vars', item.sftp_host_var) }}:{{ vault_sftp_port }};
+               mkdir -p -f plugins/KiraBukkitGateway;
+               put {{ paper_gateway_jar }} -o plugins/{{ paper_gateway_jar | basename }};
+               put /tmp/kira-gw-{{ item.server_name }}-config.yml -o plugins/KiraBukkitGateway/config.yml;
+               put {{ playbook_dir }}/certs/truststore.p12 -o plugins/KiraBukkitGateway/truststore.p12;
+               bye"
+  environment:
+    LFTP_PASSWORD: "{{ vault_sftp_password }}"
   loop: "{{ paper_servers }}"
   no_log: true
 
