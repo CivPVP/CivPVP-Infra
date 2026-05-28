@@ -17,6 +17,5 @@ paper_servers:
   - server_name: citadel
     sftp_host_var: vault_sftp_host_citadel
     sftp_user_var: vault_sftp_user_citadel
-  - server_name: lobby
-    sftp_host_var: vault_sftp_host_lobby
-    sftp_user_var: vault_sftp_user_lobby
+  # lobby is intentionally skipped: it lacks NameLayer + CivChat2, which
+  # KiraBukkitGateway hard-depends on. Re-add if those plugins are installed.
