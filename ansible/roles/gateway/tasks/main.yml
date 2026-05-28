@@ -49,3 +49,4 @@
     prompt: |
       Uploaded gateway jar + config + truststore to: {{ paper_servers | map(attribute='server_name') | join(', ') }}.
       Now click RESTART for each one in the mint-servers panel, then press Enter to continue.
+  tags: manual_restart
