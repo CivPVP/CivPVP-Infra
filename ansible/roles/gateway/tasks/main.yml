@@ -71,7 +71,7 @@
 - name: Manual restart checkpoint
   ansible.builtin.pause:
     prompt: |
-      Uploaded gateway to: {{ (paper_servers | map(attribute='server_name') | list) + [velocity_server.server_name] | join(', ') }}.
+      Uploaded gateway to: {{ ((paper_servers | map(attribute='server_name') | list) + [velocity_server.server_name]) | join(', ') }}.
       Click RESTART for the NEWLY DEPLOYED ones (citadel was already up; restart bunkies + proxy).
       Press Enter when done to continue.
   tags: manual_restart
