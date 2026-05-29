@@ -38,6 +38,7 @@
           -o BatchMode=no -o StrictHostKeyChecking=no \
           "{{ lookup('vars', item.sftp_user_var) }}@{{ lookup('vars', item.sftp_host_var) }}" <<'SFTP_EOF'
         -mkdir plugins/KiraBukkitGateway
+        -rm plugins/KiraBukkitGateway-*.jar
         put {{ paper_gateway_jar }} plugins/{{ paper_gateway_jar | basename }}
         put /tmp/kira-gw-{{ item.server_name }}-config.yml plugins/KiraBukkitGateway/config.yml
         put {{ playbook_dir }}/certs/truststore.p12 plugins/KiraBukkitGateway/truststore.p12
