@@ -1,5 +1,5 @@
 ---
-kira_image: "ghcr.io/civpvp/kira:2.2.3"
+kira_image: "ghcr.io/civpvp/kira:2.2.4"
 rabbitmq_image: "rabbitmq:3.13-management"
 postgres_image: "timescale/timescaledb:2.14.2-pg14"
 kira_dir: /opt/kira
