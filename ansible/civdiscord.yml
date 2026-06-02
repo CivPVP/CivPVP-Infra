@@ -1,0 +1,13 @@
+---
+# CivDiscord deploys from the operator's machine: SFTP push to mint-servers
+# and Pterodactyl client API for restart. Runs entirely on localhost — no
+# remote host, no privilege escalation.
+- name: Deploy CivDiscord plugin to Velocity proxy and Paper backends
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files:
+    - group_vars/civdiscord/vars.yml
+    - group_vars/civdiscord/vault.yml
+  roles:
+    - civdiscord

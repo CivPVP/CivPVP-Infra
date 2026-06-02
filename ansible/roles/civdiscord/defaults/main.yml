@@ -1,0 +1,32 @@
+---
+civdiscord_version: "v0.1.0"
+
+# GitHub release artifact base URL — the jars are named
+# CivDiscord-Velocity-<version-no-leading-v>.jar / CivDiscord-Paper-<version-no-leading-v>.jar
+# (release.yml strips the leading v before passing -Pversion).
+civdiscord_release_base: "https://github.com/grepsedawk/CivDiscord/releases/download/{{ civdiscord_version }}"
+civdiscord_version_bare: "{{ civdiscord_version | regex_replace('^v', '') }}"
+civdiscord_velocity_jar: "CivDiscord-Velocity-{{ civdiscord_version_bare }}.jar"
+civdiscord_paper_jar: "CivDiscord-Paper-{{ civdiscord_version_bare }}.jar"
+
+# Local cache for downloaded release artifacts. Shared between runs so we don't
+# re-fetch on every play.
+civdiscord_cache_dir: "{{ playbook_dir }}/.civdiscord-cache/{{ civdiscord_version }}"
+
+# Local-only canonical secret.key. The SAME bytes get pushed to Velocity AND every
+# Paper backend — that's the whole point of the HMAC shared secret. Stored under
+# the playbook dir, mode 0600, generated once.
+civdiscord_secret_key_path: "{{ playbook_dir }}/certs/civdiscord-secret.key"
+
+# civdiscord_paper_servers and civdiscord_velocity_server are defined in
+# group_vars/civdiscord/vars.yml — the deploy targets live there.
+
+civdiscord_bridge_hmac_enabled: true
+
+# Auto-restart the mint-servers Pterodactyl servers after the SFTP push so
+# the freshly uploaded jar is actually loaded. Override with
+# `-e civdiscord_restart=false` to fall back to the manual prompt.
+civdiscord_restart: true
+pterodactyl_panel_url: https://panel.mintservers.com
+pterodactyl_restart_timeout_seconds: 180
+pterodactyl_restart_poll_delay_seconds: 3

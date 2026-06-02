@@ -1,0 +1,21 @@
+---
+# mint-servers deployment targets. server_name is the panel server name; the
+# sftp_{host,user}_var keys name the vault entries holding that server's SFTP
+# endpoint (each game server has its own SFTP host + username). pterodactyl_uuid
+# drives the post-deploy auto-restart through the Pterodactyl client API.
+
+# Paper backends CivDiscord deploys to. bunkies is intentionally excluded: its
+# NameLayer/CivChat2 state answered relay permission queries before citadel,
+# making /relay bind deny READ_CHAT incorrectly.
+civdiscord_paper_servers:
+  - server_name: citadel
+    sftp_host_var: vault_sftp_host_citadel
+    sftp_user_var: vault_sftp_user_citadel
+    pterodactyl_uuid: f9faae3f
+
+# The shared Velocity proxy.
+civdiscord_velocity_server:
+  server_name: proxy
+  sftp_host_var: vault_sftp_host_velocity
+  sftp_user_var: vault_sftp_user_velocity
+  pterodactyl_uuid: 3082a419

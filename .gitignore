@@ -1,0 +1,13 @@
+# never commit secrets or runtime artifacts
+*.retry
+*.vault
+.vault_pass*
+ansible/*.log
+
+# secrets: the vault password file, the bridge HMAC key under certs/, the vault
+ansible/.vault_pass
+ansible/certs/
+ansible/group_vars/civdiscord/vault.yml
+
+# Local jar cache for the civdiscord role — fetched from GitHub releases.
+ansible/.civdiscord-cache/

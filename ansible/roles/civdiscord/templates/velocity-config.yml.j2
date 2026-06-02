@@ -1,0 +1,24 @@
+discord:
+  token: "{{ vault_discord_token }}"
+  home_guild_id: {{ vault_discord_guild_id }}
+
+database:
+  path: civdiscord.db
+
+namelayer_db:
+  host: "{{ vault_namelayer_db_host }}"
+  port: {{ vault_namelayer_db_port }}
+  user: "{{ vault_namelayer_db_user }}"
+  password: "{{ vault_namelayer_db_password }}"
+  database: "{{ vault_namelayer_db_name }}"
+
+bridge:
+  hmac_enabled: {{ civdiscord_bridge_hmac_enabled | lower }}
+
+# Patreon sync intentionally omitted — no vault_patreon_* vars exist yet.
+# When operator adds them, uncomment + wire in here.
+# patreon:
+#   access_token: "{{ '{{' }} vault_patreon_access_token {{ '}}' }}"
+#   campaign_id: "{{ '{{' }} vault_patreon_campaign_id {{ '}}' }}"
+#   tier_roles:
+#     gold: 0

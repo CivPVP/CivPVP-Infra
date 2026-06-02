@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: CivPVP
+  description: Deploy the CivDiscord Velocity + Paper plugins to mint-servers via SFTP.
+  license: MIT
+  min_ansible_version: "2.14"
+dependencies: []

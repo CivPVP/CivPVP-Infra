@@ -1,0 +1,146 @@
+---
+# Local cache for release jars — fetched once per version, reused across runs.
+- name: Ensure local jar cache dir exists
+  ansible.builtin.file:
+    path: "{{ civdiscord_cache_dir }}"
+    state: directory
+    mode: "0755"
+
+# Stat first so we skip the network round-trip (and the dry-run HEAD that
+# get_url does even when dest exists) once a version is cached.
+- name: Check cached Velocity jar
+  ansible.builtin.stat:
+    path: "{{ civdiscord_cache_dir }}/{{ civdiscord_velocity_jar }}"
+  register: civdiscord_velocity_jar_stat
+
+- name: Fetch Velocity plugin jar from GitHub release
+  ansible.builtin.get_url:
+    url: "{{ civdiscord_release_base }}/{{ civdiscord_velocity_jar }}"
+    dest: "{{ civdiscord_cache_dir }}/{{ civdiscord_velocity_jar }}"
+    mode: "0644"
+    # Release workflow does not publish a sha256 sidecar — guard omitted. If a
+    # checksum file shows up later (e.g. CivDiscord-Velocity-<v>.jar.sha256),
+    # add `checksum: "sha256:{{ lookup('url', ...) }}"`.
+  when: not civdiscord_velocity_jar_stat.stat.exists
+
+- name: Check cached Paper jar
+  ansible.builtin.stat:
+    path: "{{ civdiscord_cache_dir }}/{{ civdiscord_paper_jar }}"
+  register: civdiscord_paper_jar_stat
+
+- name: Fetch Paper plugin jar from GitHub release
+  ansible.builtin.get_url:
+    url: "{{ civdiscord_release_base }}/{{ civdiscord_paper_jar }}"
+    dest: "{{ civdiscord_cache_dir }}/{{ civdiscord_paper_jar }}"
+    mode: "0644"
+  when: not civdiscord_paper_jar_stat.stat.exists
+
+# Shared HMAC secret. Identical bytes on Velocity AND every Paper backend — that
+# is the entire purpose of the file. We materialize it ONCE on the control node
+# and SFTP-push the same blob everywhere. `creates:` makes this idempotent: the
+# key persists in playbook_dir/certs/ across runs and the next deploy reuses it.
+- name: Generate shared CivDiscord HMAC secret (once)
+  ansible.builtin.command:
+    cmd: "openssl rand -base64 64"
+  args:
+    creates: "{{ civdiscord_secret_key_path }}"
+  register: civdiscord_secret_gen
+  changed_when: civdiscord_secret_gen.rc == 0
+  no_log: true
+
+- name: Persist HMAC secret to disk (0600) if newly generated
+  ansible.builtin.copy:
+    content: "{{ civdiscord_secret_gen.stdout }}\n"
+    dest: "{{ civdiscord_secret_key_path }}"
+    mode: "0600"
+  when: civdiscord_secret_gen is changed
+  no_log: true
+
+- name: Render Velocity config locally
+  ansible.builtin.template:
+    src: velocity-config.yml.j2
+    dest: "/tmp/civdiscord-{{ civdiscord_velocity_server.server_name }}-config.yml"
+    mode: "0600"
+  no_log: true
+
+- name: Render Paper configs locally (one per backend)
+  ansible.builtin.template:
+    src: paper-config.yml.j2
+    dest: "/tmp/civdiscord-{{ item.server_name }}-config.yml"
+    mode: "0600"
+  loop: "{{ civdiscord_paper_servers }}"
+
+# Push via sshpass + sftp. Block/always guarantees the password tempfile is
+# removed even if a push fails.
+- name: Push CivDiscord files via sshpass + sftp
+  block:
+    - name: Create SFTP password tempfile
+      ansible.builtin.tempfile:
+        state: file
+        suffix: civpvp_sftp_pass
+      register: sftp_pass_file
+
+    - name: Write password (0600)
+      ansible.builtin.copy:
+        content: "{{ vault_sftp_password }}"
+        dest: "{{ sftp_pass_file.path }}"
+        mode: "0600"
+      no_log: true
+
+    - name: SFTP push to Paper backends (jar + config + secret, sweep old gateway jars)
+      ansible.builtin.shell: |
+        sshpass -f "{{ sftp_pass_file.path }}" sftp \
+          -P {{ vault_sftp_port }} \
+          -o BatchMode=no -o StrictHostKeyChecking=no \
+          "{{ lookup('vars', item.sftp_user_var) }}@{{ lookup('vars', item.sftp_host_var) }}" <<'SFTP_EOF'
+        -mkdir plugins/CivDiscord
+        -rm plugins/CivDiscord-Paper-*.jar
+        -rm plugins/KiraBukkitGateway-*.jar
+        put {{ civdiscord_cache_dir }}/{{ civdiscord_paper_jar }} plugins/{{ civdiscord_paper_jar }}
+        put /tmp/civdiscord-{{ item.server_name }}-config.yml plugins/CivDiscord/config.yml
+        put {{ civdiscord_secret_key_path }} plugins/CivDiscord/secret.key
+        bye
+        SFTP_EOF
+      loop: "{{ civdiscord_paper_servers }}"
+      no_log: true
+
+    - name: SFTP push to Velocity proxy (jar + config + secret, sweep old gateway jars)
+      ansible.builtin.shell: |
+        sshpass -f "{{ sftp_pass_file.path }}" sftp \
+          -P {{ vault_sftp_port }} \
+          -o BatchMode=no -o StrictHostKeyChecking=no \
+          "{{ lookup('vars', civdiscord_velocity_server.sftp_user_var) }}@{{ lookup('vars', civdiscord_velocity_server.sftp_host_var) }}" <<'SFTP_EOF'
+        -mkdir plugins/civdiscord
+        -rm plugins/CivDiscord-Velocity-*.jar
+        -rm plugins/KiraVelocityGateway-*.jar
+        -rm plugins/kiragateway-velocity-*.jar
+        put {{ civdiscord_cache_dir }}/{{ civdiscord_velocity_jar }} plugins/{{ civdiscord_velocity_jar }}
+        put /tmp/civdiscord-{{ civdiscord_velocity_server.server_name }}-config.yml plugins/civdiscord/config.yml
+        put {{ civdiscord_secret_key_path }} plugins/civdiscord/secret.key
+        bye
+        SFTP_EOF
+      no_log: true
+
+  always:
+    - name: Remove SFTP password tempfile
+      ansible.builtin.file:
+        path: "{{ sftp_pass_file.path }}"
+        state: absent
+      when: sftp_pass_file.path is defined
+
+# Auto-restart via the mint-servers Pterodactyl client API. Backends serial,
+# proxy last, fail loud if anything refuses to come back to `running`.
+- name: Auto-restart mint-servers via Pterodactyl
+  ansible.builtin.import_tasks: restart.yml
+  when: civdiscord_restart | default(true) | bool
+  tags: restart
+
+# Fallback: operator restarts each server manually through the panel. Only
+# fires when auto-restart is explicitly disabled (-e civdiscord_restart=false).
+- name: Manual restart checkpoint
+  ansible.builtin.pause:
+    prompt: |
+      Uploaded CivDiscord to: {{ ((civdiscord_paper_servers | map(attribute='server_name') | list) + [civdiscord_velocity_server.server_name]) | join(', ') }}.
+      Click RESTART on the mint-servers panel for each. Press Enter when done.
+  when: not (civdiscord_restart | default(true) | bool)
+  tags: manual_restart

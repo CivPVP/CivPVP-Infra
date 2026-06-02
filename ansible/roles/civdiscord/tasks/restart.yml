@@ -1,0 +1,61 @@
+---
+# Auto-restart all mint-servers in parallel via the Pterodactyl client API.
+# Step 1 fires all restart signals back-to-back (sub-second each) so all
+# servers begin restarting at the same wall-clock instant. Step 2 polls
+# each for `current_state: running` — Ansible visits the loop items
+# serially, but the real-time restarts are running in parallel on the
+# panel, so total wall time ≈ MAX(per-server restart) not SUM.
+- name: Assert mint-servers API key is set
+  ansible.builtin.assert:
+    that:
+      - vault_mintservers_api_key is defined
+      - vault_mintservers_api_key | length > 0
+    fail_msg: >-
+      vault_mintservers_api_key is missing from group_vars/civdiscord/vault.yml.
+      Generate a Pterodactyl client API key at https://panel.mintservers.com/account/api
+      and add it to the vault, or pass -e civdiscord_restart=false to skip the
+      auto-restart and fall back to the manual panel-click pause.
+  no_log: true
+
+- name: Build the full restart target list
+  ansible.builtin.set_fact:
+    civdiscord_restart_targets: >-
+      {{ civdiscord_paper_servers + [civdiscord_velocity_server] }}
+
+- name: Send restart signal to every server
+  ansible.builtin.uri:
+    url: "{{ pterodactyl_panel_url }}/api/client/servers/{{ item.pterodactyl_uuid }}/power"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ vault_mintservers_api_key }}"
+      Accept: application/json
+      Content-Type: application/json
+    body_format: json
+    body:
+      signal: restart
+    status_code: 204
+  register: power_signal
+  until: power_signal.status == 204
+  retries: 3
+  delay: 2
+  loop: "{{ civdiscord_restart_targets }}"
+  loop_control:
+    label: "{{ item.server_name }}"
+  no_log: true
+
+- name: Wait for every server to report running
+  ansible.builtin.uri:
+    url: "{{ pterodactyl_panel_url }}/api/client/servers/{{ item.pterodactyl_uuid }}/resources"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ vault_mintservers_api_key }}"
+      Accept: application/json
+    return_content: true
+  register: power_state
+  until: power_state.json.attributes.current_state == 'running'
+  retries: "{{ [1, (pterodactyl_restart_timeout_seconds | int) // ([1, pterodactyl_restart_poll_delay_seconds | int] | max)] | max }}"
+  delay: "{{ [1, pterodactyl_restart_poll_delay_seconds | int] | max }}"
+  loop: "{{ civdiscord_restart_targets }}"
+  loop_control:
+    label: "{{ item.server_name }}"
+  no_log: true

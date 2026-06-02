@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Fetch a mint-servers backend's latest log via the Pterodactyl Client API.
+#
+# Usage:
+#   bin/mc-logs <server>          # last 200 lines of latest.log
+#   bin/mc-logs <server> -n 1000  # last 1000 lines
+#   bin/mc-logs <server> --full   # entire latest.log
+#   bin/mc-logs <server> --file logs/<other>.log
+#
+# <server> is one of: citadel, bunkies, proxy.
+#
+# The Pterodactyl client API key is read from the encrypted vault at
+# ansible/group_vars/civdiscord/vault.yml (key: vault_mintservers_api_key).
+set -euo pipefail
+
+PANEL="https://panel.mintservers.com"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VAULT="$REPO_ROOT/ansible/group_vars/civdiscord/vault.yml"
+
+SERVER="${1:-}"
+case "$SERVER" in
+  citadel) UUID=f9faae3f ;;
+  bunkies) UUID=df2cbf1e ;;
+  proxy)   UUID=3082a419 ;;
+  ""|-h|--help)
+    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+  *)
+    echo "unknown server: $SERVER (use citadel | bunkies | proxy)" >&2
+    exit 2
+    ;;
+esac
+shift
+
+LINES=200
+FILE="logs/latest.log"
+FULL=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n) LINES="$2"; shift 2 ;;
+    --full) FULL=1; shift ;;
+    --file) FILE="$2"; shift 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+# Vault may quote the value (single or double); strip outer quotes if present.
+KEY="$(ANSIBLE_CONFIG="$REPO_ROOT/ansible/ansible.cfg" \
+  ansible-vault view "$VAULT" 2>/dev/null \
+  | python3 -c '
+import sys
+for line in sys.stdin:
+    if line.startswith("vault_mintservers_api_key:"):
+        v = line.split(":", 1)[1].strip()
+        if len(v) >= 2 and v[0] in ("\"", "'"'"'") and v[-1] == v[0]:
+            v = v[1:-1]
+        print(v)
+        break
+')"
+
+if [[ -z "$KEY" ]]; then
+  echo "vault_mintservers_api_key not found in $VAULT" >&2
+  exit 1
+fi
+
+URL="$PANEL/api/client/servers/$UUID/files/contents?file=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$FILE")"
+
+BODY="$(curl -sS -f \
+  -H "Authorization: Bearer $KEY" \
+  -H "Accept: application/json" \
+  "$URL")" || { echo "log fetch failed for $SERVER ($UUID)" >&2; exit 1; }
+
+if [[ "$FULL" -eq 1 ]]; then
+  printf '%s\n' "$BODY"
+else
+  printf '%s\n' "$BODY" | tail -n "$LINES"
+fi
