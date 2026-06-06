@@ -87,7 +87,7 @@
         mode: "0600"
       no_log: true
 
-    - name: SFTP push to Paper backends (jar + config + secret, sweep old gateway jars)
+    - name: SFTP push to Paper backends (jar + config + secret)
       ansible.builtin.shell: |
         sshpass -f "{{ sftp_pass_file.path }}" sftp \
           -P {{ vault_sftp_port }} \
@@ -95,7 +95,6 @@
           "{{ lookup('vars', item.sftp_user_var) }}@{{ lookup('vars', item.sftp_host_var) }}" <<'SFTP_EOF'
         -mkdir plugins/CivDiscord
         -rm plugins/CivDiscord-Paper-*.jar
-        -rm plugins/KiraBukkitGateway-*.jar
         put {{ civdiscord_cache_dir }}/{{ civdiscord_paper_jar }} plugins/{{ civdiscord_paper_jar }}
         put /tmp/civdiscord-{{ item.server_name }}-config.yml plugins/CivDiscord/config.yml
         put {{ civdiscord_secret_key_path }} plugins/CivDiscord/secret.key
@@ -104,7 +103,7 @@
       loop: "{{ civdiscord_paper_servers }}"
       no_log: true
 
-    - name: SFTP push to Velocity proxy (jar + config + secret, sweep old gateway jars)
+    - name: SFTP push to Velocity proxy (jar + config + secret)
       ansible.builtin.shell: |
         sshpass -f "{{ sftp_pass_file.path }}" sftp \
           -P {{ vault_sftp_port }} \
@@ -112,8 +111,6 @@
           "{{ lookup('vars', civdiscord_velocity_server.sftp_user_var) }}@{{ lookup('vars', civdiscord_velocity_server.sftp_host_var) }}" <<'SFTP_EOF'
         -mkdir plugins/civdiscord
         -rm plugins/CivDiscord-Velocity-*.jar
-        -rm plugins/KiraVelocityGateway-*.jar
-        -rm plugins/kiragateway-velocity-*.jar
         put {{ civdiscord_cache_dir }}/{{ civdiscord_velocity_jar }} plugins/{{ civdiscord_velocity_jar }}
         put /tmp/civdiscord-{{ civdiscord_velocity_server.server_name }}-config.yml plugins/civdiscord/config.yml
         put {{ civdiscord_secret_key_path }} plugins/civdiscord/secret.key
