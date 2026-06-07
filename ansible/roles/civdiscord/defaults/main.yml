@@ -1,5 +1,5 @@
 ---
-civdiscord_version: "v0.2.3"
+civdiscord_version: "v0.3.0"
 
 # GitHub release artifact base URL — the jars are named
 # CivDiscord-Velocity-<version-no-leading-v>.jar / CivDiscord-Paper-<version-no-leading-v>.jar
