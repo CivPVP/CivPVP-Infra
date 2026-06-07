@@ -1,0 +1,16 @@
+---
+# Restart the CivDiscord mint-servers without redeploying. Deploys never
+# restart (see civdiscord.yml); run this when you want the pushed jar loaded.
+# Runs entirely on localhost via the Pterodactyl client API.
+- name: Restart CivDiscord mint-servers
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars_files:
+    - group_vars/civdiscord/vars.yml
+    - group_vars/civdiscord/vault.yml
+  tasks:
+    - name: Restart via Pterodactyl
+      ansible.builtin.import_role:
+        name: civdiscord
+        tasks_from: restart

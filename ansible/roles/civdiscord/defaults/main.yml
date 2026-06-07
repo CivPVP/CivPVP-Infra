@@ -1,5 +1,5 @@
 ---
-civdiscord_version: "v0.1.0"
+civdiscord_version: "v0.2.3"
 
 # GitHub release artifact base URL — the jars are named
 # CivDiscord-Velocity-<version-no-leading-v>.jar / CivDiscord-Paper-<version-no-leading-v>.jar
@@ -23,10 +23,8 @@ civdiscord_secret_key_path: "{{ playbook_dir }}/certs/civdiscord-secret.key"
 
 civdiscord_bridge_hmac_enabled: true
 
-# Auto-restart the mint-servers Pterodactyl servers after the SFTP push so
-# the freshly uploaded jar is actually loaded. Override with
-# `-e civdiscord_restart=false` to fall back to the manual prompt.
-civdiscord_restart: true
+# Restart is a separate playbook (restart.yml), never part of a deploy — the
+# freshly pushed jar loads on the next restart you trigger.
 pterodactyl_panel_url: https://panel.mintservers.com
 pterodactyl_restart_timeout_seconds: 180
 pterodactyl_restart_poll_delay_seconds: 3

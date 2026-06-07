@@ -13,7 +13,8 @@ the Pterodactyl client API.
 
 ```
 ansible/
-  civdiscord.yml              the only playbook (hosts: localhost)
+  civdiscord.yml              deploy playbook (hosts: localhost)
+  restart.yml                 restart-only playbook (no redeploy)
   ansible.cfg                 vault auto-decrypt via .vault_pass
   group_vars/civdiscord/
     vars.yml                  deploy targets (citadel, proxy) + uuids
@@ -33,10 +34,15 @@ ansible-playbook civdiscord.yml
 ```
 
 `.vault_pass` decrypts `group_vars/civdiscord/vault.yml` automatically. The
-play uploads the jars + configs and restarts each server. Pass
-`-e civdiscord_restart=false` to skip the auto-restart and get a manual
-panel-click prompt instead, or `-e civdiscord_version=vX.Y.Z` to pin a
+play uploads the jars + configs and does **not** restart anything — the new jar
+loads on the next restart. Pass `-e civdiscord_version=vX.Y.Z` to pin a
 different release.
+
+Restart the servers (separate from deploy):
+
+```sh
+ansible-playbook restart.yml
+```
 
 Tail a backend's log:
 

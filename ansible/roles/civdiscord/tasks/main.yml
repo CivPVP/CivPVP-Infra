@@ -125,19 +125,10 @@
         state: absent
       when: sftp_pass_file.path is defined
 
-# Auto-restart via the mint-servers Pterodactyl client API. Backends serial,
-# proxy last, fail loud if anything refuses to come back to `running`.
-- name: Auto-restart mint-servers via Pterodactyl
-  ansible.builtin.import_tasks: restart.yml
-  when: civdiscord_restart | default(true) | bool
-  tags: restart
-
-# Fallback: operator restarts each server manually through the panel. Only
-# fires when auto-restart is explicitly disabled (-e civdiscord_restart=false).
-- name: Manual restart checkpoint
-  ansible.builtin.pause:
-    prompt: |
-      Uploaded CivDiscord to: {{ ((civdiscord_paper_servers | map(attribute='server_name') | list) + [civdiscord_velocity_server.server_name]) | join(', ') }}.
-      Click RESTART on the mint-servers panel for each. Press Enter when done.
-  when: not (civdiscord_restart | default(true) | bool)
-  tags: manual_restart
+# A deploy never restarts. The new jar loads on the next restart you trigger —
+# panel click, or `ansible-playbook restart.yml`.
+- name: Restart reminder
+  ansible.builtin.debug:
+    msg: >-
+      Uploaded CivDiscord to {{ ((civdiscord_paper_servers | map(attribute='server_name') | list) + [civdiscord_velocity_server.server_name]) | join(', ') }}.
+      Not restarted. Restart via the panel, or run: ansible-playbook restart.yml
